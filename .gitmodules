@@ -1,0 +1,6 @@
+[submodule "Expedia-Hotel-Recommendations"]
+	path = Expedia-Hotel-Recommendations
+	url = git@github.com:zzsza/Kaggle_Expedia-hotel-recommendations.git
+[submodule "Santander-Product-Recommendation"]
+	path = Santander-Product-Recommendation
+	url = git@github.com:zzsza/Kaggle_Santander-Product-Recommendation.git
