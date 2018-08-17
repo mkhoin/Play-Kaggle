@@ -1,0 +1,495 @@
+{
+  "cells": [
+    {
+      "metadata": {
+        "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+        "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+        "trusted": true
+      },
+      "cell_type": "code",
+      "source": "# This Python 3 environment comes with many helpful analytics libraries installed\n# It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python\n# For example, here's several helpful packages to load in \n\nimport numpy as np # linear algebra\nimport pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\nimport lightgbm as lgbm\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nfrom sklearn.model_selection import KFold, StratifiedKFold\nfrom sklearn.metrics import log_loss\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier\nfrom sklearn.neighbors import KNeighborsClassifier\nfrom sklearn.svm import SVC\nfrom sklearn.preprocessing import LabelEncoder, StandardScaler\n\nfrom keras.models import Sequential\nfrom keras.layers import Dense\nfrom keras.layers import Dense, Dropout, BatchNormalization, Activation \nfrom keras.callbacks import EarlyStopping, ModelCheckpoint\nfrom keras import optimizers\n\n# Input data files are available in the \"../input/\" directory.\n# For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory\n\nimport os\nprint(os.listdir(\"../input\"))\nimport gc\n# Any results you write to the current directory are saved as output.",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_cell_guid": "79c7e3d0-c299-4dcb-8224-4455121ee9b0",
+        "_uuid": "d629ff2d2480ee46fbb7e2d37f6b5fab8052498a",
+        "trusted": true
+      },
+      "cell_type": "code",
+      "source": "train = pd.read_csv('../input/kaggletutorial/covertype_train.csv')\ntest = pd.read_csv('../input/kaggletutorial/covertype_test.csv')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "65b72bb0d8154f120af671b081b1e79ad900d0e4",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "train.shape",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "0efdb8653fec5559a7efde210bb8342d32905785",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "test.shape",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "db50e3f6aa627bef579ed09e163066b5a2756dfd",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "train_index = train.shape[0]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "8b0be2f6db719fe4582c480a09cc52633491bff8"
+      },
+      "cell_type": "markdown",
+      "source": "### Label Encoding 실습"
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "5354a896e619a1e1478a0abd84ae67ae5789978e",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "original_all_data = pd.concat([train, test])\nall_data = original_all_data.copy()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "96a9922df712155985e28196478ccbb7eba1379d",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "original_all_data['Soil_Type']",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "a732e98832377528da348a53b48f9a212e64a59d",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "for col in all_data.loc[:,all_data.dtypes=='object'].columns:\n    all_data[col] = all_data[col].factorize()[0]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "1910154a822aae592cf4da693e93b9c7e26734f8",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data['Soil_Type']",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "cb6a3cb43b28a734ae577e197165037783aefa6d",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data2 = pd.concat([train, test])\nfor col in all_data2.loc[:,all_data2.dtypes=='object'].columns:\n    le = LabelEncoder()\n    all_data2[col] = le.fit_transform(all_data2[col])",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "4764fe5226bd4694b9ed6886d34d715e681cb0f1",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data2['Soil_Type']",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "fb089996ff79a0e812517700fc7d4720d7e67c1a",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "unique_soil_type = sorted(original_all_data['Soil_Type'].unique())\nfor index, soil in enumerate(unique_soil_type):\n    print(soil, original_all_data.loc[original_all_data['Soil_Type']==soil ].shape[0], \n          all_data2.loc[all_data2['Soil_Type']==index ].shape[0]) ",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "6d9bc5128572eaa99a1848797dc7eb370517610b",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "unique_soil_type = sorted(original_all_data['Soil_Type'].unique())\nfor index, soil in enumerate(unique_soil_type):\n    print(soil, original_all_data.loc[original_all_data['Soil_Type']==soil ].shape[0], \n          all_data.loc[all_data['Soil_Type']==index ].shape[0]) ",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "dab2f02edea6bf4d4725b23a8428a9c4d450fc5b"
+      },
+      "cell_type": "markdown",
+      "source": "#### 속도 비교"
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "8e3689c2be476b572cf9783ba5c50d8209c43049",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data2 = pd.concat([train, test])\nle = LabelEncoder()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "6f7e084b8b3a00fd54267e20b136edec9e3b4c2f",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "%timeit(le.fit_transform(all_data2['Soil_Type']))",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "bf8ba8c712500c6cfbaaa10c41d54f16ad6af4d6",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "%timeit(all_data2['Soil_Type'].factorize()[0])",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "85a1ef45403e50500e17f671997e79c6666eaf12",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data = pd.concat([train, test])\nfor col in all_data.loc[:, all_data.dtypes=='object'].columns:\n    all_data[col] = all_data[col].factorize()[0]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "36ca057e85b03be377118d3732c67b0d5f2d713f"
+      },
+      "cell_type": "markdown",
+      "source": "# 앞으로 FE를 통해서 Model의 성능을 올리고 Tree Model과 선형 모델간 비교를 하도록 하겠습니다.\n### 그에 앞서 기준이 되는 Tree Model 입니다. 아무것도 하지 않고 Label Encoding만 수행한 Tree Model 입니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "6942ece41af9976cd699e0bd74291fa2c2b816a9",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "train_df = all_data.iloc[:train_index]\ntest_df = all_data.iloc[train_index:]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "c8e679967c9fb6db6f545a8f38f5ac462fb8a143",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "y_value = train_df['Cover_Type']\ndel train_df['Cover_Type'], train_df['ID']\n\ndel test_df['Cover_Type'], test_df['ID']",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "322bcc661611f2a964044b4d345c927ff711294e"
+      },
+      "cell_type": "markdown",
+      "source": "파라미터 튜닝 마음껏 하셔도 됩니다!"
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "0155bb0feff08cbcdb70fbe4950eda6c03bed7ae",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "lgbm_param =  {\n    'boosting_type': 'gbdt',\n    'objective': 'binary',\n    'metric': 'binary_logloss',\n    \"learning_rate\": 0.06,\n    \"num_leaves\": 16,\n    \"max_depth\": 6,\n    \"colsample_bytree\": 0.7,\n    \"subsample\": 0.8,\n    \"reg_alpha\": 0.1,\n    \"reg_lambda\": 0.1,\n    \"nthread\":8\n}",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "25e11dae23e7eac04bf29494774142980f965ec9",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "NFOLD = 5\nfolds = StratifiedKFold(n_splits= NFOLD, shuffle=True, random_state=2018)\n\ntotal_score = 0\nbest_iteration = 0\nfor n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df, y_value)):\n    train_x, train_y = train_df.iloc[train_idx], y_value.iloc[train_idx]\n    valid_x, valid_y = train_df.iloc[valid_idx], y_value.iloc[valid_idx]\n    \n    evals_result_dict = {} \n    dtrain = lgbm.Dataset(train_x, label=train_y)\n    dvalid = lgbm.Dataset(valid_x, label=valid_y)\n  \n    clf = lgbm.train(lgbm_param, train_set=dtrain, num_boost_round=3000, valid_sets=[dtrain, dvalid],\n                           early_stopping_rounds=200, evals_result=evals_result_dict, verbose_eval=100)\n    \n    predict = clf.predict(valid_x)\n    cv_score = log_loss(valid_y, predict )\n    total_score += cv_score\n    best_iteration = max(best_iteration, clf.best_iteration)\n    print('Fold {} LogLoss : {}'.format(n_fold + 1, cv_score ))\n    lgbm.plot_metric(evals_result_dict)\n    plt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "0b143eaf208aa31f315f95a2272eb4e339957fc8",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "print(\"Best Iteration\", best_iteration)\nprint(\"Total LogLoss\", total_score/NFOLD)\ndtrain = lgbm.Dataset(train_df, label=y_value)\nclf = lgbm.train(lgbm_param, train_set=dtrain, num_boost_round=best_iteration)\npredict = clf.predict(test_df)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "566ad55c0881a7d9f792bd82a2df7ca3875a4379"
+      },
+      "cell_type": "code",
+      "source": "submission = pd.read_csv('../input/kaggletutorial/sample_submission.csv')\nsubmission[\"Cover_Type\"] = predict\nsubmission.to_csv('lightgbm_baseline_{:.5f}.csv'.format(total_score/NFOLD), index=False)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "1cf4d03134b4e43463d49b43a758f86567492d5c"
+      },
+      "cell_type": "markdown",
+      "source": "## Tree Model과 비교될 Neural Network 모델입니다.\n아주 간단하게 Layer가 구성되어 있습니다.<br>\nLabel Encoding만하고 Null 값만 채웠을 경우 아예 학습이 되지 않아. StandardScaler까지 진행하였습니다. <br>"
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "688070a6913830bec1039b5c44c2aabe40d846e6",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data = pd.concat([train, test])",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "3f9093c2b1d43a8402214b6c23d8676d668f899c",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data = pd.concat([train, test])\ncategory_feature = []\nfor col in all_data.loc[:, all_data.dtypes=='object'].columns:\n    all_data[col] = all_data[col].factorize()[0]\n    category_feature.append(col)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "702cf465bbbc34eedcae489d0e34e7ccc91076b1",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "category_feature",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "1b9bec3f2079066258bd3e33298642ab908837b3",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data.isnull().sum()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "6af4d3c7e16f5e0133f92c044037de7bac55281a",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "sns.distplot(all_data.loc[all_data['Aspect'].notnull(),'Aspect'])\nplt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "beffb3130d7ae45daee6e9e11921c4de972dd816",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "sns.distplot(all_data['Aspect'].fillna(all_data['Aspect'].mean()))\nplt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "4e6d0329001f2cedd1ece01ac8100f0d8bc3a922",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "all_data['Aspect'].fillna(all_data['Aspect'].mean(), inplace=True)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "a22759cc9bb77a64d6a3dcc9f3f1f91bae7a2bdd",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "train_df = all_data.iloc[:train_index]\ntest_df = all_data.iloc[train_index:]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "cc90eeadfc5557e55bd70cf5a5acdf199c79d6ad",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "numerical_feature = list(set(train_df.columns) - set(category_feature) - set(['Cover_Type','ID']))\nnumerical_feature",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "f6b3af1c3e343575c529f8e4bdf970f8ce47cbf8",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "sc = StandardScaler()\ntrain_df[numerical_feature] = sc.fit_transform(train_df[numerical_feature])\ntest_df[numerical_feature] = sc.transform(test_df[numerical_feature] )",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "13465981549fc8859f983f860a2cad4b4694ff0f",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "y_value = train_df['Cover_Type']\ndel train_df['Cover_Type'], train_df['ID']\n\ndel test_df['Cover_Type'], test_df['ID']",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "7c6bda2704c14fb165a4453bc7fe43b82a5de8c6",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "def keras_model(input_dims):\n    model = Sequential()\n    \n    model.add(Dense(input_dims, input_dim=input_dims))\n    model.add(BatchNormalization())\n    model.add(Activation('relu'))\n    model.add(Dropout(0.3))\n    \n    model.add(Dense(input_dims//2))\n    model.add(BatchNormalization())\n    model.add(Activation('relu'))\n    model.add(Dropout(0.2))\n    \n    # output layer (y_pred)\n    model.add(Dense(1))\n    model.add(Activation('sigmoid'))\n    \n    # compile this model\n    model.compile(loss='binary_crossentropy', # one may use 'mean_absolute_error' as alternative\n                  optimizer='adam', metrics=['accuracy'])\n    return model\n\ndef keras_history_plot(history):\n    plt.plot(history.history['loss'], 'y', label='train loss')\n    plt.plot(history.history['val_loss'], 'r', label='val loss')\n    plt.xlabel('epoch')\n    plt.ylabel('loss')\n    plt.legend(loc='upper right')\n    plt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "d23bc6c1df08429be5548b816cb2efa9ebdaf6ad",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "model = keras_model(train_df.shape[1])\ncallbacks = [\n        EarlyStopping(\n            patience=10,\n            verbose=10)\n    ]\n\n\nNFOLD = 5\nfolds = StratifiedKFold(n_splits= NFOLD, shuffle=True, random_state=2018)\n\ntotal_score = 0\nbest_epoch = 0\nfor n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df, y_value)):\n    train_x, train_y = train_df.iloc[train_idx], y_value.iloc[train_idx]\n    valid_x, valid_y = train_df.iloc[valid_idx], y_value.iloc[valid_idx]\n    \n    history = model.fit(train_x.values, train_y.values, nb_epoch=30, batch_size = 64, validation_data=(valid_x.values, valid_y.values), \n                        verbose=1, callbacks=callbacks)\n    \n    keras_history_plot(history)\n    predict = model.predict(valid_x.values)\n    null_count = np.sum(pd.isnull(predict) )\n    if null_count > 0:\n        print(\"Null Prediction Error: \", null_count)\n        predict[pd.isnull(predict)] = predict[~pd.isnull(predict)].mean()\n    \n    cv_score = log_loss(valid_y, predict )\n    total_score += cv_score\n    best_epoch = max(best_epoch, np.max(history.epoch))\n    print('Fold {} LogLoss : {}'.format(n_fold + 1, cv_score ))",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "82805732dbcd8176b766232612140d6d4b4ebad3",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "print(\"Best Epoch: \", best_epoch)\nprint(\"Total LogLoss\", total_score/NFOLD)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "5ac66e537e2a2f8306486f8fcbc2fee79edf07c0",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "history = model.fit(train_df.values, y_value.values, nb_epoch=best_epoch, batch_size = 64, verbose=1)\npredict = model.predict(test_df.values)\nnull_count = np.sum(pd.isnull(predict) )\nif null_count > 0:\n    print(\"Null Prediction Error: \", null_count)\n    predict[pd.isnull(predict)] = predict[~pd.isnull(predict)].mean()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "9bc9c2272ce1aeae2bdb7c60e97b95a06395bd07",
+        "collapsed": true
+      },
+      "cell_type": "code",
+      "source": "submission = pd.read_csv('../input/kaggletutorial/sample_submission.csv')\nsubmission[\"Cover_Type\"] = predict\nsubmission.to_csv('neuralnetwork_baseline_{:.5f}.csv'.format(total_score/NFOLD), index=False)",
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python",
+      "version": "3.6.6",
+      "mimetype": "text/x-python",
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "pygments_lexer": "ipython3",
+      "nbconvert_exporter": "python",
+      "file_extension": ".py"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 1
+}

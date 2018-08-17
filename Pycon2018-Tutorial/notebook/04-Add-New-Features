@@ -1,0 +1,539 @@
+{
+  "cells": [
+    {
+      "metadata": {
+        "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+        "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+        "trusted": true
+      },
+      "cell_type": "code",
+      "source": "# This Python 3 environment comes with many helpful analytics libraries installed\n# It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python\n# For example, here's several helpful packages to load in \n\nimport numpy as np # linear algebra\nimport pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\n\n# Input data files are available in the \"../input/\" directory.\n# For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory\nimport numpy as np # linear algebra\nimport pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\nimport lightgbm as lgbm\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nfrom sklearn.model_selection import KFold, StratifiedKFold\nfrom sklearn.metrics import log_loss, mean_squared_error\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier\nfrom sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor\nfrom sklearn.svm import SVC\nfrom sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler, OneHotEncoder\n\nfrom keras.models import Sequential\nfrom keras.layers import Dense\nfrom keras.layers import Dense, Dropout, BatchNormalization, Activation \nfrom keras.callbacks import EarlyStopping, ModelCheckpoint\nfrom keras import optimizers\n\nimport warnings\nwarnings.filterwarnings('ignore')\n\nimport os\nprint(os.listdir(\"../input\"))\n\nimport regex as re\nimport gc\n# Any results you write to the current directory are saved as output.",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_cell_guid": "79c7e3d0-c299-4dcb-8224-4455121ee9b0",
+        "_uuid": "d629ff2d2480ee46fbb7e2d37f6b5fab8052498a",
+        "trusted": true
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_score = 0.23092278864723115\nbaseline_neuralnetwork_score = 0.5480561937041435",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "8802086d122a06d1f6eedf375335841995a28417"
+      },
+      "cell_type": "code",
+      "source": "train = pd.read_csv('../input/kaggletutorial/covertype_train.csv')\ntest = pd.read_csv('../input/kaggletutorial/covertype_test.csv')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "57470082acadf05dbf84f8518de14a9ee79ecb74"
+      },
+      "cell_type": "code",
+      "source": "train_index = train.shape[0]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "e9cf5ec563b6845f9476da51c59f097003594e68"
+      },
+      "cell_type": "markdown",
+      "source": "## Utility Function 입니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "a6907ee62417eeff98a04192a8e4c87f2ab63cc2"
+      },
+      "cell_type": "code",
+      "source": "lgbm_param =  {\n    'boosting_type': 'gbdt',\n    'objective': 'binary',\n    'metric': 'binary_logloss',\n    \"learning_rate\": 0.06,\n    \"num_leaves\": 16,\n    \"max_depth\": 6,\n    \"colsample_bytree\": 0.7,\n    \"subsample\": 0.8,\n    \"reg_alpha\": 0.1,\n    \"reg_lambda\": 0.1,\n    \"nthread\":8\n}",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "bb6441020514eb87c1cda909c9dd5b50dc6cdce6"
+      },
+      "cell_type": "code",
+      "source": "def keras_model(input_dims):\n    model = Sequential()\n    \n    model.add(Dense(input_dims, input_dim=input_dims))\n    model.add(BatchNormalization())\n    model.add(Activation('relu'))\n    model.add(Dropout(0.3))\n    \n    model.add(Dense(input_dims//2))\n    model.add(BatchNormalization())\n    model.add(Activation('relu'))\n    model.add(Dropout(0.2))\n    \n    # output layer (y_pred)\n    model.add(Dense(1))\n    model.add(Activation('sigmoid'))\n    \n    # compile this model\n    model.compile(loss='binary_crossentropy', # one may use 'mean_absolute_error' as alternative\n                  optimizer='adam', metrics=['accuracy'])\n    return model\n\ndef keras_history_plot(history):\n    plt.plot(history.history['loss'], 'y', label='train loss')\n    plt.plot(history.history['val_loss'], 'r', label='val loss')\n    plt.xlabel('epoch')\n    plt.ylabel('loss')\n    plt.legend(loc='upper right')\n    plt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "16bb0861cf192e28a33e37e51f41d019e5c7e1f1"
+      },
+      "cell_type": "code",
+      "source": "def baseline_tree_cv(train):\n    train_df = train.copy()\n    y_value = train_df[\"Cover_Type\"]\n    del train_df[\"Cover_Type\"], train_df[\"ID\"]\n    \n    NFOLD = 5\n    folds = StratifiedKFold(n_splits= NFOLD, shuffle=True, random_state=2018)\n\n    total_score = 0\n    best_iteration = 0\n    for n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df, y_value)):\n        train_x, train_y = train_df.iloc[train_idx], y_value.iloc[train_idx]\n        valid_x, valid_y = train_df.iloc[valid_idx], y_value.iloc[valid_idx]\n\n        evals_result_dict = {} \n        dtrain = lgbm.Dataset(train_x, label=train_y)\n        dvalid = lgbm.Dataset(valid_x, label=valid_y)\n\n        clf = lgbm.train(lgbm_param, train_set=dtrain, num_boost_round=3000, valid_sets=[dtrain, dvalid],\n                               early_stopping_rounds=200, evals_result=evals_result_dict, verbose_eval=500)\n\n        predict = clf.predict(valid_x)\n        cv_score = log_loss(valid_y, predict )\n        total_score += cv_score\n        best_iteration = max(best_iteration, clf.best_iteration)\n        print('Fold {} LogLoss : {}'.format(n_fold + 1, cv_score ))\n        lgbm.plot_metric(evals_result_dict)\n        plt.show()\n        \n    print(\"Best Iteration\", best_iteration)\n    print(\"Total LogLoss\", total_score / NFOLD)\n    print(\"Baseline model Score Diff\", total_score / NFOLD - baseline_tree_score)\n    \n    del train_df\n    \n    return best_iteration\n\ndef baseline_keras_cv(train):\n    train_df = train.copy()\n    y_value = train_df['Cover_Type']\n    del train_df['Cover_Type'], train_df['ID']\n    \n    model = keras_model(train_df.shape[1])\n    callbacks = [\n            EarlyStopping(\n                patience=10,\n                verbose=10)\n        ]\n\n    NFOLD = 5\n    folds = StratifiedKFold(n_splits= NFOLD, shuffle=True, random_state=2018)\n\n    total_score = 0\n    best_epoch = 0\n    for n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df, y_value)):\n        train_x, train_y = train_df.iloc[train_idx], y_value.iloc[train_idx]\n        valid_x, valid_y = train_df.iloc[valid_idx], y_value.iloc[valid_idx]\n\n        history = model.fit(train_x.values, train_y.values, nb_epoch=30, batch_size = 64, validation_data=(valid_x.values, valid_y.values), \n                            verbose=1, callbacks=callbacks)\n\n        keras_history_plot(history)\n        predict = model.predict(valid_x.values)\n        null_count = np.sum(pd.isnull(predict) )\n        if null_count > 0:\n            print(\"Null Prediction Error: \", null_count)\n            predict[pd.isnull(predict)] = predict[~pd.isnull(predict)].mean()\n\n        cv_score = log_loss(valid_y, predict )\n        total_score += cv_score\n        best_epoch = max(best_epoch, np.max(history.epoch))\n        print('Fold {} LogLoss : {}'.format(n_fold + 1, cv_score ))\n        \n    print(\"Best Epoch: \", best_epoch)\n    print(\"Total LogLoss\", total_score/NFOLD)\n    print(\"Baseline model Score Diff\", total_score/NFOLD - baseline_neuralnetwork_score)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "2f4ac4c0b0e597057ca61fb1bb60265b2dc87297"
+      },
+      "cell_type": "code",
+      "source": "def outlier_binary(frame, col, outlier_range):\n    outlier_feature = col + '_Outlier'\n    frame[outlier_feature] = 0\n    frame.loc[frame[col] > outlier_range, outlier_feature] = 1\n    return frame\n\ndef outlier_divide_ratio(frame, col, outlier_range):\n    outlier_index = frame[col] >= outlier_range\n    outlier_median =  frame.loc[outlier_index, col].median()\n    normal_median = frame.loc[frame[col] < outlier_range, col].median()\n    outlier_ratio = outlier_median / normal_median\n    \n    frame.loc[outlier_index, col] = frame.loc[outlier_index, col]/outlier_ratio\n    return frame\n\ndef frequency_encoding(frame, col):\n    freq_encoding = frame.groupby([col]).size()/frame.shape[0] \n    freq_encoding = freq_encoding.reset_index().rename(columns={0:'{}_Frequncy'.format(col)})\n    return frame.merge(freq_encoding, on=col, how='left')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "ea7b4a5d14dd85b7e685a664cc222cdef71c2961"
+      },
+      "cell_type": "markdown",
+      "source": "Tree Model과 NeuralNetwork Model의 전처리가 다르기 때문에 Tree용 Data, NN용 데이터를 분리합니다.<br>\nFE 시에는 수행시간이 빠른 LightGBM을 기준으로 하겠습니다."
+    },
+    {
+      "metadata": {
+        "_uuid": "a6c006cb7a136ad272790e4b7fe4e2d174c5deba"
+      },
+      "cell_type": "markdown",
+      "source": "### 지금까지 수행했던 전처리 입니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "f8db3f4fa7875120b3352e5aa7cedaea0fa12ad3"
+      },
+      "cell_type": "code",
+      "source": "def tree_data_preprocessing(train, test):\n    train_index = train.shape[0]\n    all_data = pd.concat([train, test])\n    del all_data['oil_Type']\n\n    all_column_set = set(all_data.columns)\n    category_feature = []\n    for col in all_data.loc[:, all_data.dtypes=='object'].columns:\n        all_data[col] = all_data[col].factorize()[0]\n        category_feature.append(col)\n\n    numerical_feature = list(all_column_set - set(category_feature) - set(['Cover_Type','ID']))\n\n    # all_data['Aspect'].fillna(all_data['Aspect'].mean(), inplace=True)\n    all_data['Elevation'] = np.log1p(all_data['Elevation'])\n\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = frequency_encoding(all_data, 'Soil_Type')\n    all_data = frequency_encoding(all_data, 'Wilderness_Area')\n\n    aspect_train = all_data.loc[all_data['Aspect'].notnull()]\n    aspect_test = all_data.loc[all_data['Aspect'].isnull()]\n    del aspect_train[\"Cover_Type\"], aspect_train['ID']\n    del aspect_test[\"Cover_Type\"], aspect_test['ID']\n\n    numerical_feature_woaspect = numerical_feature[:]\n    numerical_feature_woaspect.remove('Aspect')\n\n    sc = StandardScaler()\n    aspect_train[numerical_feature_woaspect] = sc.fit_transform(aspect_train[numerical_feature_woaspect])\n    aspect_test[numerical_feature_woaspect] = sc.transform(aspect_test[numerical_feature_woaspect] )\n\n    y_value = aspect_train['Aspect']\n    del aspect_train['Aspect'], aspect_test['Aspect']\n\n    knn = KNeighborsRegressor(n_neighbors=7)\n    knn.fit(aspect_train,y_value)\n    predict = knn.predict(aspect_test)\n\n    sns.distplot(predict)\n    sns.distplot(all_data['Aspect'].dropna())\n    plt.title('KNN Aspect Null Imputation')\n    plt.show()\n\n    all_data.loc[all_data['Aspect'].isnull(),'Aspect'] = predict\n    \n    train_df = all_data.iloc[:train_index]\n    test_df = all_data.iloc[train_index:]\n    \n    del all_data, predict, aspect_train, aspect_test\n    gc.collect()\n    \n    return train_df, test_df",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "097fef2a022b620142dec7e1b2460fc2aedf6044"
+      },
+      "cell_type": "code",
+      "source": "train_df, test_df = tree_data_preprocessing(train, test)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "c4955c1f45fb455b8f45c8c5188e0fea355ab464"
+      },
+      "cell_type": "markdown",
+      "source": "# Add New Feature"
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "d0bd01b33d79ccbe97e5cea73b700e9e5d1c9d11"
+      },
+      "cell_type": "code",
+      "source": "all_data = pd.concat([train_df, test_df])",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "0f6890034461baf11c52070d33adfcb1a91297ce"
+      },
+      "cell_type": "code",
+      "source": "distance_feature = [col for col in train.columns if col.find('Distance') != -1 ]\ndistance_feature",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "f3c050c3983f97b828ccfe64f5418d4ca2452dcb"
+      },
+      "cell_type": "code",
+      "source": "all_data[distance_feature].head()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "b94014047d1accf0505e96376c37d095303086e7"
+      },
+      "cell_type": "code",
+      "source": "all_data['Horizontal_Distance_To_Hydrology'] = all_data['Horizontal_Distance_To_Hydrology']/1000",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "b5db7c35bb00ac4a0eae19df9c499aacbbc1fb67"
+      },
+      "cell_type": "code",
+      "source": "sns.pairplot(all_data[distance_feature + ['Cover_Type']], hue='Cover_Type', x_vars=distance_feature, y_vars=distance_feature, size=3)\nplt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "334d8cc5470abe558f89638c25949fba58424357"
+      },
+      "cell_type": "markdown",
+      "source": "Elevation / quantitative /meters / Elevation in meters <br>\nAspect / quantitative / azimuth / Aspect in degrees azimuth <br>\nSlope / quantitative / degrees / Slope in degrees <br>\nHorizontal_Distance_To_Hydrology / quantitative / meters / Horz Dist to nearest surface water features <br>\nVertical_Distance_To_Hydrology / quantitative / meters / Vert Dist to nearest surface water features <br>\nHorizontal_Distance_To_Roadways / quantitative / meters / Horz Dist to nearest roadway <br>\nHillshade_9am / quantitative / 0 to 255 index / Hillshade index at 9am, summer solstice <br>\nHillshade_Noon / quantitative / 0 to 255 index / Hillshade index at noon, summer soltice <br>\nHillshade_3pm / quantitative / 0 to 255 index / Hillshade index at 3pm, summer solstice <br>\nHorizontal_Distance_To_Fire_Points / quantitative / meters / Horz Dist to nearest wildfire ignition points <br>\nWilderness_Area (4 binary columns) / qualitative / 0 (absence) or 1 (presence) / Wilderness area designation <br>\nSoil_Type (40 binary columns) / qualitative / 0 (absence) or 1 (presence) / Soil Type designation <br>\nCover_Type (7 types) / integer / 1 to 7 / Forest Cover Type designation<br>"
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "107d6041e9efafa41bde789879b8b21389c3d697"
+      },
+      "cell_type": "code",
+      "source": "all_data['HF1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Fire_Points']\nall_data['HF2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Fire_Points']\nall_data['HF3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Fire_Points'])\nall_data['HF4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Fire_Points']\n\nall_data['HR1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Roadways']\nall_data['HR2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Roadways']\nall_data['HR3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Roadways'])\nall_data['HR4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Roadways']\n\nall_data['HH1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Vertical_Distance_To_Hydrology']\nall_data['HH2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Vertical_Distance_To_Hydrology']\nall_data['HH3'] = np.log1p(abs(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Vertical_Distance_To_Hydrology']))\nall_data['HH4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Vertical_Distance_To_Hydrology']\n\nall_data['FR1'] = all_data['Horizontal_Distance_To_Fire_Points'] + all_data['Horizontal_Distance_To_Roadways']\nall_data['FR2'] = all_data['Horizontal_Distance_To_Fire_Points'] - all_data['Horizontal_Distance_To_Roadways']\nall_data['FR3'] = np.log1p(all_data['Horizontal_Distance_To_Fire_Points'] * all_data['Horizontal_Distance_To_Roadways'])\nall_data['FR4'] = all_data['Horizontal_Distance_To_Fire_Points'] / all_data['Horizontal_Distance_To_Roadways']\n\nall_data['Direct_Distance_Hydrology'] = (all_data['Horizontal_Distance_To_Hydrology']**2+all_data['Vertical_Distance_To_Hydrology']**2)**0.5",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "8cb0a9eb892890e447aaeb9d68a78f3614b26072"
+      },
+      "cell_type": "code",
+      "source": "np.isinf(all_data).sum()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "1f8315560f1398bb2f59800b0f521e156a373027"
+      },
+      "cell_type": "code",
+      "source": "all_data.loc[np.isinf(all_data['HF4']),'HF4'] = 0\nall_data.loc[np.isinf(all_data['HR4']),'HR4'] = 0\nall_data.loc[np.isinf(all_data['HH4']),'HH4'] = 0\nall_data.loc[np.isinf(all_data['FR4']),'FR4'] = 0",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "4a86cf95a1a27ef1ed3b883d88781e7839a372b8"
+      },
+      "cell_type": "code",
+      "source": "np.isinf(all_data).sum().sum()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "89e5512cdce8fcce0ed5323224e105c49b1654b8"
+      },
+      "cell_type": "code",
+      "source": "all_data.isnull().sum()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "7f901d046d66749e086472f4f6262f0f50e71e71"
+      },
+      "cell_type": "code",
+      "source": "all_data[['HF4','HH4']] = all_data[['HF4','HH4']].fillna(0)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "eae83d97edb2b155d457aa42df56455c7c203991"
+      },
+      "cell_type": "code",
+      "source": "def target_disturibution(frame, col):\n    sns.distplot(frame.loc[frame['Cover_Type']==0, col])\n    sns.distplot(frame.loc[frame['Cover_Type']==1, col])\n    plt.title(col)\n    plt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "c357598a458cfc648ef0c7d116c715ffc83fe01e"
+      },
+      "cell_type": "code",
+      "source": "train_df = all_data.iloc[:train_index]\ntest_df = all_data.iloc[train_index:]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "3ea57afff1aaa5e1fe919a380b572e198d8ef849"
+      },
+      "cell_type": "code",
+      "source": "for col in train_df.columns:\n    if col.find('HF') != -1 or col.find('HH') != -1 or col.find('FR') != -1 or col.find('HR') != -1:\n        target_disturibution(train_df,col)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "8cd41d205b54f2729a1835b469f4972cc4dc3e2d"
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_cv(train_df)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "a90bfcb966f7041591319280759781b22723f3c1"
+      },
+      "cell_type": "code",
+      "source": "other_numerical_feature = ['Aspect', 'Elevation', 'Slope', 'Hillshade_3pm', 'Hillshade_9am', 'Hillshade_Noon']",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "57ef9f3e23cf8ac4da92d209e9f5d8bd6ec41b94"
+      },
+      "cell_type": "code",
+      "source": "sns.pairplot(all_data[other_numerical_feature + ['Cover_Type']], hue='Cover_Type', x_vars=other_numerical_feature, y_vars=other_numerical_feature, size=3)\nplt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "39fc0e53d7a0e594fe850613c1b7ab3321ab76da"
+      },
+      "cell_type": "code",
+      "source": "sns.scatterplot('Elevation', 'Aspect', hue='Cover_Type',data=all_data)\nplt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "272ccb0b3bf3b07208c766f1c3ac72500a080446"
+      },
+      "cell_type": "code",
+      "source": "def scatter_quantile_graph(frame, col1, col2):\n    col1_quantile = np.arange(0,1.1,0.1)\n    col2_quantile = np.arange(0,1.1,0.2)\n    \n    sns.scatterplot(col1, col2, hue='Cover_Type',data=frame)\n    for quantile_value in frame[col1].quantile(col1_quantile):\n        plt.axvline(quantile_value, color='red')\n    for quantile_value in frame[col2].quantile(col2_quantile):\n        plt.axhline(quantile_value, color='blue')\n\n    plt.title('{} - {}'.format(col1,col2))\n    plt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "45a00a9d0fe6fd95ad50b06fa70addc7215ef399"
+      },
+      "cell_type": "code",
+      "source": "scatter_quantile_graph(all_data, 'Elevation', 'Aspect')\nscatter_quantile_graph(all_data, 'Elevation', 'Slope')\nscatter_quantile_graph(all_data, 'Elevation', 'Hillshade_3pm')\nscatter_quantile_graph(all_data, 'Elevation', 'Hillshade_9am')\nscatter_quantile_graph(all_data, 'Elevation', 'Hillshade_Noon')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "58d2ccf029972904eb6521dec4a0bf9b2d4d27b0"
+      },
+      "cell_type": "markdown",
+      "source": "## Elevation과 Aspect를 Adaptive Binning 하여 Category Combine 합니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "eaf360afb0cb7fe74d439306de0ab4f516102b01"
+      },
+      "cell_type": "code",
+      "source": "all_data_binning = all_data.copy()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "3e137d516162ecd9f9259b4611cf0b50ae6cf79d"
+      },
+      "cell_type": "code",
+      "source": "quantile_10 = np.arange(0,1.1,0.1)\nquantile_5 = np.arange(0,1.1,0.2)\n    \nall_data_binning['Elevation_quantile_label'] = pd.qcut(\n                                            all_data_binning['Elevation'], \n                                            q=quantile_10, labels = ['Ele_quantile_{:.1f}'.format(col) for col in quantile_10][1:])\n\nall_data_binning['Aspect_quantile_label'] = pd.qcut(\n                                            all_data_binning['Aspect'], \n                                            q=quantile_5, labels = ['Aspect_quantile_{:.1f}'.format(col) for col in quantile_5][1:])",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "69d61f157172ef958ad523b417d7b6865be4c118"
+      },
+      "cell_type": "code",
+      "source": "all_data_binning['Ele_Asp_Combine'] = all_data_binning[['Elevation_quantile_label','Aspect_quantile_label']].apply(lambda row: row['Elevation_quantile_label'] +'_'+ row['Aspect_quantile_label'] ,axis=1)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "c803d8cf74c0ce6c6c639009c39c1c6df5d35a7b"
+      },
+      "cell_type": "code",
+      "source": "all_data_binning['Ele_Asp_Combine'].nunique()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "9dc97b4730bc581b4f8867aeef7827ba25ba4e5d"
+      },
+      "cell_type": "code",
+      "source": "for col in ['Elevation_quantile_label','Aspect_quantile_label','Ele_Asp_Combine']:\n    all_data_binning[col] = all_data_binning[col].factorize()[0]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "2dd946b74a92ec416f37d88c686cb7b6041ec285"
+      },
+      "cell_type": "code",
+      "source": "train_df_binning = all_data_binning.iloc[:train_index]\ntest_df_binning = all_data_binning.iloc[train_index:]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "65013de28ed3cf031dab89494dc4f4e40a0600e6"
+      },
+      "cell_type": "markdown",
+      "source": "## Tree Model에서 성능향상을 볼 수 있습니다. "
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "316b86e3784ad746131364f12b7f4d7cb382f704"
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_cv(train_df_binning)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "72de2a61a8a1ba1f5d9ac7f5923eee06b10e64ec"
+      },
+      "cell_type": "code",
+      "source": "def binning_category_combine_feature(frame, col1, col2, col1_quantile, col2_quantile):\n    print(col1, ' ', col2, 'Bining Combine')\n    col1_quantile = np.arange(0,1.1,col1_quantile)\n    col2_quantile = np.arange(0,1.1,col2_quantile)\n    \n    col1_label = '{}_quantile_label'.format(col1)\n    frame[col1_label] = pd.qcut(frame[col1], q=col1_quantile, labels = ['{}_quantile_{:.1f}'.format(col1, col) for col in col1_quantile][1:])\n    \n    col2_label = '{}_quantile_label'.format(col2)\n    frame[col2_label] = pd.qcut(frame[col2], q=col2_quantile, labels = ['{}_quantile_{:.1f}'.format(col2, col) for col in col2_quantile][1:])\n    \n    combine_label = 'Binnig_{}_{}_Combine'.format(col1, col2)\n    frame[combine_label] = frame[[col1_label, col2_label]].apply(lambda row: row[col1_label] +'_'+ row[col2_label] ,axis=1)\n    for col in [col1_label, col2_label, combine_label]:\n        frame[col] = frame[col].factorize()[0]\n    \n    # del frame[col1_label], frame[col2_label]\n    gc.collect()\n    return frame, [col1_label, col2_label, combine_label]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "009944ccaf31c8a5d8b92feb2b0339759c724948"
+      },
+      "cell_type": "code",
+      "source": "all_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Aspect', 0.1, 0.1)\n\n\"\"\" 나머지 부분은 Feature 추가하면서 성능 검토 바랍니다~!\nall_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Slope', 0.1, 0.2)\nfor col in new_col:\n    all_data = frequency_encoding(all_data, col)\n\nall_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Hillshade_3pm', 0.1, 0.2)\nfor col in new_col:\n    all_data = frequency_encoding(all_data, col)\n\nall_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Hillshade_9am', 0.1, 0.2)\nfor col in new_col:\n    all_data = frequency_encoding(all_data, col)\n\nall_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Hillshade_Noon', 0.1, 0.2)\nfor col in new_col:\n    all_data = frequency_encoding(all_data, col)\n\"\"\"",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "4ef769a45cb2d34f9df1284b51b334e45f1f086c"
+      },
+      "cell_type": "code",
+      "source": "all_data.head()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "fe0c3519420c307e14a3c80ba98f8dbcecfc35a4"
+      },
+      "cell_type": "code",
+      "source": "train_df = all_data.iloc[:train_index]\ntest_df = all_data.iloc[train_index:]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "250a252c0cb6a36d1dd6688a546c77926c6b533b"
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_cv(train_df)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "240d761b444b7066a1285cfd710aaf44ed7a4cb5"
+      },
+      "cell_type": "markdown",
+      "source": "# 지금까지 추가한 Feature를 정리하여 Neural Network에서 해보도록 하겠습니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "03b8eff1555c10d9ad95163c32dcff27a0ec434b"
+      },
+      "cell_type": "code",
+      "source": "def nn_data_preprocessing(train, test):\n    train_index = train.shape[0]\n    all_data = pd.concat([train, test])\n    del all_data['oil_Type']\n\n    all_column_set = set(all_data.columns)\n    category_feature = []\n    for col in all_data.loc[:, all_data.dtypes=='object'].columns:\n        all_data[col] = all_data[col].factorize()[0]\n        category_feature.append(col)\n\n    numerical_feature = list(all_column_set - set(category_feature) - set(['Cover_Type','ID']))\n    \n    all_data['Elevation'] = np.log1p(all_data['Elevation'])\n\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = frequency_encoding(all_data, 'Soil_Type')\n    all_data = frequency_encoding(all_data, 'Wilderness_Area')\n\n    aspect_train = all_data.loc[all_data['Aspect'].notnull()]\n    aspect_test = all_data.loc[all_data['Aspect'].isnull()]\n    del aspect_train[\"Cover_Type\"], aspect_train['ID']\n    del aspect_test[\"Cover_Type\"], aspect_test['ID']\n\n    numerical_feature_woaspect = numerical_feature[:]\n    numerical_feature_woaspect.remove('Aspect')\n\n    sc = StandardScaler()\n    aspect_train[numerical_feature_woaspect] = sc.fit_transform(aspect_train[numerical_feature_woaspect])\n    aspect_test[numerical_feature_woaspect] = sc.transform(aspect_test[numerical_feature_woaspect] )\n\n    y_value = aspect_train['Aspect']\n    del aspect_train['Aspect'], aspect_test['Aspect']\n\n    knn = KNeighborsRegressor(n_neighbors=7)\n    knn.fit(aspect_train,y_value)\n    predict = knn.predict(aspect_test)\n\n    sns.distplot(predict)\n    sns.distplot(all_data['Aspect'].dropna())\n    plt.title('KNN Aspect Null Imputation')\n    plt.show()\n\n    all_data.loc[all_data['Aspect'].isnull(),'Aspect'] = predict\n    \n    before_one_hot = set(all_data.columns)\n    for col in category_feature:\n        all_data = pd.concat([all_data,pd.get_dummies(all_data[col],prefix=col)],axis=1)\n        del all_data[col]\n    one_hot_feature = set(all_data.columns) - before_one_hot\n    \n    all_data['HF1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Fire_Points']\n    all_data['HF2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Fire_Points']\n    all_data['HF3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Fire_Points'])\n    all_data['HF4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Fire_Points']\n\n    all_data['HR1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Roadways']\n    all_data['HR2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Roadways']\n    all_data['HR3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Roadways'])\n    all_data['HR4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Roadways']\n\n    all_data['HH1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Vertical_Distance_To_Hydrology']\n    all_data['HH2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Vertical_Distance_To_Hydrology']\n    all_data['HH3'] = np.log1p(abs(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Vertical_Distance_To_Hydrology']))\n    all_data['HH4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Vertical_Distance_To_Hydrology']\n\n    all_data['FR1'] = all_data['Horizontal_Distance_To_Fire_Points'] + all_data['Horizontal_Distance_To_Roadways']\n    all_data['FR2'] = all_data['Horizontal_Distance_To_Fire_Points'] - all_data['Horizontal_Distance_To_Roadways']\n    all_data['FR3'] = np.log1p(all_data['Horizontal_Distance_To_Fire_Points'] * all_data['Horizontal_Distance_To_Roadways'])\n    all_data['FR4'] = all_data['Horizontal_Distance_To_Fire_Points'] / all_data['Horizontal_Distance_To_Roadways']\n\n    all_data['Direct_Distance_Hydrology'] = (all_data['Horizontal_Distance_To_Hydrology']**2+all_data['Vertical_Distance_To_Hydrology']**2)**0.5\n    \n    all_data.loc[np.isinf(all_data['HF4']),'HF4'] = 0\n    all_data.loc[np.isinf(all_data['HR4']),'HR4'] = 0\n    all_data.loc[np.isinf(all_data['HH4']),'HH4'] = 0\n    all_data.loc[np.isinf(all_data['FR4']),'FR4'] = 0\n    \n    all_data[['HF4','HH4']] = all_data[['HF4','HH4']].fillna(0)\n    \n    all_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Aspect', 0.1, 0.1)\n    \n    for col in new_col:\n        all_data = frequency_encoding(all_data, col)\n        \n    all_data.drop(columns=new_col,axis=1,inplace=True)\n    \n    scale_feature = list(set(all_data.columns)-one_hot_feature-set(['Cover_Type','ID']))\n    \n    train_df = all_data.iloc[:train_index]\n    test_df = all_data.iloc[train_index:]\n\n    sc = StandardScaler()\n    train_df[scale_feature] = sc.fit_transform(train_df[scale_feature])\n    test_df[scale_feature] = sc.transform(test_df[scale_feature] )\n    \n    return train_df, test_df",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "e1b4db64e1d196a10abf7339345fe26f578b66c5"
+      },
+      "cell_type": "code",
+      "source": "nn_train_df, nn_test_df = nn_data_preprocessing(train, test)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "cc1b051ca203fd67cc9f2dd4467ba79609b23ca1"
+      },
+      "cell_type": "code",
+      "source": "baseline_keras_cv(nn_train_df)",
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python",
+      "version": "3.6.6",
+      "mimetype": "text/x-python",
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "pygments_lexer": "ipython3",
+      "nbconvert_exporter": "python",
+      "file_extension": ".py"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 1
+}

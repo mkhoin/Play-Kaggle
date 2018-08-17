@@ -1,0 +1,241 @@
+{
+  "cells": [
+    {
+      "metadata": {
+        "_uuid": "8f2839f25d086af736a60e9eeb907d3b93b6e0e5",
+        "_cell_guid": "b1076dfc-b9ad-4769-8c92-a6c4dae69d19",
+        "trusted": true
+      },
+      "cell_type": "code",
+      "source": "# This Python 3 environment comes with many helpful analytics libraries installed\n# It is defined by the kaggle/python docker image: https://github.com/kaggle/docker-python\n# For example, here's several helpful packages to load in \n\nimport numpy as np # linear algebra\nimport pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\n\n# Input data files are available in the \"../input/\" directory.\n# For example, running this (by clicking run or pressing Shift+Enter) will list the files in the input directory\nimport numpy as np # linear algebra\nimport pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)\nimport lightgbm as lgbm\nimport matplotlib.pyplot as plt\nimport seaborn as sns\nfrom sklearn.model_selection import KFold, StratifiedKFold\nfrom sklearn.metrics import log_loss, mean_squared_error\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier\nfrom sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor\nfrom sklearn.svm import SVC\nfrom sklearn.preprocessing import LabelEncoder, StandardScaler, MinMaxScaler, OneHotEncoder\n\nfrom keras.models import Sequential\nfrom keras.layers import Dense\nfrom keras.layers import Dense, Dropout, BatchNormalization, Activation \nfrom keras.callbacks import EarlyStopping, ModelCheckpoint\nfrom keras import optimizers\n\nimport warnings\nwarnings.filterwarnings('ignore')\n\nimport os\nprint(os.listdir(\"../input\"))\n\nimport regex as re\nimport gc\n# Any results you write to the current directory are saved as output.",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_cell_guid": "79c7e3d0-c299-4dcb-8224-4455121ee9b0",
+        "_uuid": "d629ff2d2480ee46fbb7e2d37f6b5fab8052498a",
+        "trusted": true
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_score = 0.23092278864723115\nbaseline_neuralnetwork_score = 0.5480561937041435",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "c8366fb34bf1b43bbfae0bc94ce03e96bdae6646"
+      },
+      "cell_type": "code",
+      "source": "train = pd.read_csv('../input/kaggletutorial/covertype_train.csv')\ntest = pd.read_csv('../input/kaggletutorial/covertype_test.csv')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "3c2c1ec7a45a74e5e7b22620f0852413962865ad"
+      },
+      "cell_type": "code",
+      "source": "train_index = train.shape[0]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "10c5dbd11dbdd62e9a4cd6c345d41b45257aab3d"
+      },
+      "cell_type": "code",
+      "source": "lgbm_param =  {\n    'boosting_type': 'gbdt',\n    'objective': 'binary',\n    'metric': 'binary_logloss',\n    \"learning_rate\": 0.06,\n    \"num_leaves\": 16,\n    \"max_depth\": 6,\n    \"colsample_bytree\": 0.7,\n    \"subsample\": 0.8,\n    \"reg_alpha\": 0.1,\n    \"reg_lambda\": 0.1,\n    \"nthread\":8\n}",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "22d6fd60402f8d3471fce14191614904ad7e61c6"
+      },
+      "cell_type": "code",
+      "source": "def keras_model(input_dims):\n    model = Sequential()\n    \n    model.add(Dense(input_dims, input_dim=input_dims))\n    model.add(BatchNormalization())\n    model.add(Activation('relu'))\n    model.add(Dropout(0.3))\n    \n    model.add(Dense(input_dims//2))\n    model.add(BatchNormalization())\n    model.add(Activation('relu'))\n    model.add(Dropout(0.2))\n    \n    # output layer (y_pred)\n    model.add(Dense(1))\n    model.add(Activation('sigmoid'))\n    \n    # compile this model\n    model.compile(loss='binary_crossentropy', # one may use 'mean_absolute_error' as alternative\n                  optimizer='adam', metrics=['accuracy'])\n    return model\n\ndef keras_history_plot(history):\n    plt.plot(history.history['loss'], 'y', label='train loss')\n    plt.plot(history.history['val_loss'], 'r', label='val loss')\n    plt.xlabel('epoch')\n    plt.ylabel('loss')\n    plt.legend(loc='upper right')\n    plt.show()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "a16395053125162d190f6f713a5c0b4895d03080"
+      },
+      "cell_type": "code",
+      "source": "def baseline_tree_cv(train):\n    train_df = train.copy()\n    y_value = train_df[\"Cover_Type\"]\n    del train_df[\"Cover_Type\"], train_df[\"ID\"]\n    \n    NFOLD = 5\n    folds = StratifiedKFold(n_splits= NFOLD, shuffle=True, random_state=2018)\n\n    total_score = 0\n    best_iteration = 0\n    for n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df, y_value)):\n        train_x, train_y = train_df.iloc[train_idx], y_value.iloc[train_idx]\n        valid_x, valid_y = train_df.iloc[valid_idx], y_value.iloc[valid_idx]\n\n        evals_result_dict = {} \n        dtrain = lgbm.Dataset(train_x, label=train_y)\n        dvalid = lgbm.Dataset(valid_x, label=valid_y)\n\n        clf = lgbm.train(lgbm_param, train_set=dtrain, num_boost_round=3000, valid_sets=[dtrain, dvalid],\n                               early_stopping_rounds=200, evals_result=evals_result_dict, verbose_eval=500)\n\n        predict = clf.predict(valid_x)\n        cv_score = log_loss(valid_y, predict )\n        total_score += cv_score\n        best_iteration = max(best_iteration, clf.best_iteration)\n        print('Fold {} LogLoss : {}'.format(n_fold + 1, cv_score ))\n        lgbm.plot_metric(evals_result_dict)\n        plt.show()\n        \n    print(\"Best Iteration\", best_iteration)\n    print(\"Total LogLoss\", total_score / NFOLD)\n    print(\"Baseline model Score Diff\", total_score / NFOLD - baseline_tree_score)\n    \n    del train_df\n    \n    return best_iteration\n\ndef baseline_keras_cv(train):\n    train_df = train.copy()\n    y_value = train_df['Cover_Type']\n    del train_df['Cover_Type'], train_df['ID']\n    \n    model = keras_model(train_df.shape[1])\n    callbacks = [\n            EarlyStopping(\n                patience=10,\n                verbose=10)\n        ]\n\n    NFOLD = 5\n    folds = StratifiedKFold(n_splits= NFOLD, shuffle=True, random_state=2018)\n\n    total_score = 0\n    best_epoch = 0\n    for n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df, y_value)):\n        train_x, train_y = train_df.iloc[train_idx], y_value.iloc[train_idx]\n        valid_x, valid_y = train_df.iloc[valid_idx], y_value.iloc[valid_idx]\n\n        history = model.fit(train_x.values, train_y.values, nb_epoch=30, batch_size = 64, validation_data=(valid_x.values, valid_y.values), \n                            verbose=1, callbacks=callbacks)\n\n        keras_history_plot(history)\n        predict = model.predict(valid_x.values)\n        null_count = np.sum(pd.isnull(predict) )\n        if null_count > 0:\n            print(\"Null Prediction Error: \", null_count)\n            predict[pd.isnull(predict)] = predict[~pd.isnull(predict)].mean()\n\n        cv_score = log_loss(valid_y, predict )\n        total_score += cv_score\n        best_epoch = max(best_epoch, np.max(history.epoch))\n        print('Fold {} LogLoss : {}'.format(n_fold + 1, cv_score ))\n        \n    print(\"Best Epoch: \", best_epoch)\n    print(\"Total LogLoss\", total_score/NFOLD)\n    print(\"Baseline model Score Diff\", total_score/NFOLD - baseline_neuralnetwork_score)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "1bbbce8cf2952b2e7e517a6bdbdfda21edb1c60d"
+      },
+      "cell_type": "code",
+      "source": "def outlier_binary(frame, col, outlier_range):\n    outlier_feature = col + '_Outlier'\n    frame[outlier_feature] = 0\n    frame.loc[frame[col] > outlier_range, outlier_feature] = 1\n    return frame\n\ndef outlier_divide_ratio(frame, col, outlier_range):\n    outlier_index = frame[col] >= outlier_range\n    outlier_median =  frame.loc[outlier_index, col].median()\n    normal_median = frame.loc[frame[col] < outlier_range, col].median()\n    outlier_ratio = outlier_median / normal_median\n    \n    frame.loc[outlier_index, col] = frame.loc[outlier_index, col]/outlier_ratio\n    return frame\n\ndef frequency_encoding(frame, col):\n    freq_encoding = frame.groupby([col]).size()/frame.shape[0] \n    freq_encoding = freq_encoding.reset_index().rename(columns={0:'{}_Frequncy'.format(col)})\n    return frame.merge(freq_encoding, on=col, how='left')\n\ndef binning_category_combine_feature(frame, col1, col2, col1_quantile, col2_quantile):\n    print(col1, ' ', col2, 'Bining Combine')\n    col1_quantile = np.arange(0,1.1,col1_quantile)\n    col2_quantile = np.arange(0,1.1,col2_quantile)\n    \n    col1_label = '{}_quantile_label'.format(col1)\n    frame[col1_label] = pd.qcut(frame[col1], q=col1_quantile, labels = ['{}_quantile_{:.1f}'.format(col1, col) for col in col1_quantile][1:])\n    \n    col2_label = '{}_quantile_label'.format(col2)\n    frame[col2_label] = pd.qcut(frame[col2], q=col2_quantile, labels = ['{}_quantile_{:.1f}'.format(col2, col) for col in col2_quantile][1:])\n    \n    combine_label = 'Binnig_{}_{}_Combine'.format(col1, col2)\n    frame[combine_label] = frame[[col1_label, col2_label]].apply(lambda row: row[col1_label] +'_'+ row[col2_label] ,axis=1)\n    for col in [col1_label, col2_label, combine_label]:\n        frame[col] = frame[col].factorize()[0]\n    \n    # del frame[col1_label], frame[col2_label]\n    gc.collect()\n    return frame, [col1_label, col2_label, combine_label]",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "45b39f8701b24a89c37279760bf041b902f0c656"
+      },
+      "cell_type": "markdown",
+      "source": "# 지금까지 수행했던 전처리 입니다. "
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "40d5aee57ce2fe87d143c863274202bdf4337ed4"
+      },
+      "cell_type": "code",
+      "source": "def tree_data_preprocessing(train, test):\n    train_index = train.shape[0]\n    all_data = pd.concat([train, test])\n    del all_data['oil_Type']\n\n    all_column_set = set(all_data.columns)\n    category_feature = []\n    for col in all_data.loc[:, all_data.dtypes=='object'].columns:\n        all_data[col] = all_data[col].factorize()[0]\n        category_feature.append(col)\n\n    numerical_feature = list(all_column_set - set(category_feature) - set(['Cover_Type','ID']))\n\n    all_data['Elevation'] = np.log1p(all_data['Elevation'])\n\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = frequency_encoding(all_data, 'Soil_Type')\n    all_data = frequency_encoding(all_data, 'Wilderness_Area')\n\n    aspect_train = all_data.loc[all_data['Aspect'].notnull()]\n    aspect_test = all_data.loc[all_data['Aspect'].isnull()]\n    del aspect_train[\"Cover_Type\"], aspect_train['ID']\n    del aspect_test[\"Cover_Type\"], aspect_test['ID']\n\n    numerical_feature_woaspect = numerical_feature[:]\n    numerical_feature_woaspect.remove('Aspect')\n\n    sc = StandardScaler()\n    aspect_train[numerical_feature_woaspect] = sc.fit_transform(aspect_train[numerical_feature_woaspect])\n    aspect_test[numerical_feature_woaspect] = sc.transform(aspect_test[numerical_feature_woaspect] )\n\n    y_value = aspect_train['Aspect']\n    del aspect_train['Aspect'], aspect_test['Aspect']\n    \n    knn = KNeighborsRegressor(n_neighbors=7)\n    knn.fit(aspect_train,y_value)\n    predict = knn.predict(aspect_test)\n    \n    sns.distplot(predict)\n    sns.distplot(all_data['Aspect'].dropna())\n    plt.title('KNN Aspect Null Imputation')\n    plt.show()\n    \n    all_data.loc[all_data['Aspect'].isnull(),'Aspect'] = predict\n    \n    all_data['Horizontal_Distance_To_Hydrology'] = all_data['Horizontal_Distance_To_Hydrology']/1000\n    all_data['HF1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Fire_Points']\n    all_data['HF2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Fire_Points']\n    all_data['HF3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Fire_Points'])\n    all_data['HF4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Fire_Points']\n\n    all_data['HR1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Roadways']\n    all_data['HR2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Roadways']\n    all_data['HR3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Roadways'])\n    all_data['HR4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Roadways']\n\n    all_data['HH1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Vertical_Distance_To_Hydrology']\n    all_data['HH2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Vertical_Distance_To_Hydrology']\n    all_data['HH3'] = np.log1p(abs(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Vertical_Distance_To_Hydrology']))\n    all_data['HH4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Vertical_Distance_To_Hydrology']\n\n    all_data['FR1'] = all_data['Horizontal_Distance_To_Fire_Points'] + all_data['Horizontal_Distance_To_Roadways']\n    all_data['FR2'] = all_data['Horizontal_Distance_To_Fire_Points'] - all_data['Horizontal_Distance_To_Roadways']\n    all_data['FR3'] = np.log1p(all_data['Horizontal_Distance_To_Fire_Points'] * all_data['Horizontal_Distance_To_Roadways'])\n    all_data['FR4'] = all_data['Horizontal_Distance_To_Fire_Points'] / all_data['Horizontal_Distance_To_Roadways']\n    \n    all_data['Direct_Distance_Hydrology'] = (all_data['Horizontal_Distance_To_Hydrology']**2+all_data['Vertical_Distance_To_Hydrology']**2)**0.5\n    \n    all_data.loc[np.isinf(all_data['HF4']),'HF4'] = 0\n    all_data.loc[np.isinf(all_data['HR4']),'HR4'] = 0\n    all_data.loc[np.isinf(all_data['HH4']),'HH4'] = 0\n    all_data.loc[np.isinf(all_data['FR4']),'FR4'] = 0\n    all_data[['HF4','HH4']] = all_data[['HF4','HH4']].fillna(0)\n    \n    all_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Aspect', 0.1, 0.1) \n    for col in new_col:\n        all_data = frequency_encoding(all_data, col)\n        \n    train_df = all_data.iloc[:train_index]\n    test_df = all_data.iloc[train_index:]\n    \n    del all_data, predict, aspect_train, aspect_test\n    gc.collect()\n    \n    return train_df, test_df",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "fa81b366732f1a232df8bd9a66b337a7199ffd69"
+      },
+      "cell_type": "code",
+      "source": "def nn_data_preprocessing(train, test):\n    train_index = train.shape[0]\n    all_data = pd.concat([train, test])\n    del all_data['oil_Type']\n\n    all_column_set = set(all_data.columns)\n    category_feature = []\n    for col in all_data.loc[:, all_data.dtypes=='object'].columns:\n        all_data[col] = all_data[col].factorize()[0]\n        category_feature.append(col)\n    \n    numerical_feature = list(all_column_set - set(category_feature) - set(['Cover_Type','ID']))\n    \n    all_data['Elevation'] = np.log1p(all_data['Elevation'])\n\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_binary(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Fire_Points', 10000)\n    all_data = outlier_divide_ratio(all_data, 'Horizontal_Distance_To_Roadways', 10000)\n\n    all_data = frequency_encoding(all_data, 'Soil_Type')\n    all_data = frequency_encoding(all_data, 'Wilderness_Area')\n\n    aspect_train = all_data.loc[all_data['Aspect'].notnull()]\n    aspect_test = all_data.loc[all_data['Aspect'].isnull()]\n    del aspect_train[\"Cover_Type\"], aspect_train['ID']\n    del aspect_test[\"Cover_Type\"], aspect_test['ID']\n\n    numerical_feature_woaspect = numerical_feature[:]\n    numerical_feature_woaspect.remove('Aspect')\n\n    sc = StandardScaler()\n    aspect_train[numerical_feature_woaspect] = sc.fit_transform(aspect_train[numerical_feature_woaspect])\n    aspect_test[numerical_feature_woaspect] = sc.transform(aspect_test[numerical_feature_woaspect] )\n\n    y_value = aspect_train['Aspect']\n    del aspect_train['Aspect'], aspect_test['Aspect']\n\n    knn = KNeighborsRegressor(n_neighbors=7)\n    knn.fit(aspect_train,y_value)\n    predict = knn.predict(aspect_test)\n\n    sns.distplot(predict)\n    sns.distplot(all_data['Aspect'].dropna())\n    plt.title('KNN Aspect Null Imputation')\n    plt.show()\n\n    all_data.loc[all_data['Aspect'].isnull(),'Aspect'] = predict\n    \n    all_data['Horizontal_Distance_To_Hydrology'] = all_data['Horizontal_Distance_To_Hydrology']/1000\n    all_data['HF1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Fire_Points']\n    all_data['HF2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Fire_Points']\n    all_data['HF3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Fire_Points'])\n    all_data['HF4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Fire_Points']\n\n    all_data['HR1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Horizontal_Distance_To_Roadways']\n    all_data['HR2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Horizontal_Distance_To_Roadways']\n    all_data['HR3'] = np.log1p(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Horizontal_Distance_To_Roadways'])\n    all_data['HR4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Horizontal_Distance_To_Roadways']\n\n    all_data['HH1'] = all_data['Horizontal_Distance_To_Hydrology'] + all_data['Vertical_Distance_To_Hydrology']\n    all_data['HH2'] = all_data['Horizontal_Distance_To_Hydrology'] - all_data['Vertical_Distance_To_Hydrology']\n    all_data['HH3'] = np.log1p(abs(all_data['Horizontal_Distance_To_Hydrology'] * all_data['Vertical_Distance_To_Hydrology']))\n    all_data['HH4'] = all_data['Horizontal_Distance_To_Hydrology'] / all_data['Vertical_Distance_To_Hydrology']\n\n    all_data['FR1'] = all_data['Horizontal_Distance_To_Fire_Points'] + all_data['Horizontal_Distance_To_Roadways']\n    all_data['FR2'] = all_data['Horizontal_Distance_To_Fire_Points'] - all_data['Horizontal_Distance_To_Roadways']\n    all_data['FR3'] = np.log1p(all_data['Horizontal_Distance_To_Fire_Points'] * all_data['Horizontal_Distance_To_Roadways'])\n    all_data['FR4'] = all_data['Horizontal_Distance_To_Fire_Points'] / all_data['Horizontal_Distance_To_Roadways']\n\n    all_data['Direct_Distance_Hydrology'] = (all_data['Horizontal_Distance_To_Hydrology']**2+all_data['Vertical_Distance_To_Hydrology']**2)**0.5\n    \n    all_data.loc[np.isinf(all_data['HF4']),'HF4'] = 0\n    all_data.loc[np.isinf(all_data['HR4']),'HR4'] = 0\n    all_data.loc[np.isinf(all_data['HH4']),'HH4'] = 0\n    all_data.loc[np.isinf(all_data['FR4']),'FR4'] = 0\n    \n    all_data[['HF4','HH4']] = all_data[['HF4','HH4']].fillna(0)\n    \n    all_data, new_col = binning_category_combine_feature(all_data, 'Elevation', 'Aspect', 0.1, 0.1)\n    \n    for col in new_col:\n        all_data = frequency_encoding(all_data, col)\n        \n    all_data.drop(columns=new_col,axis=1,inplace=True)\n    \n    before_one_hot = set(all_data.columns)\n    for col in category_feature:\n        all_data = pd.concat([all_data,pd.get_dummies(all_data[col],prefix=col)],axis=1)\n        \n    one_hot_feature = set(all_data.columns) - before_one_hot\n    \n    train_df = all_data.iloc[:train_index]\n    test_df = all_data.iloc[train_index:]\n    \n    soil_mean_encoding = train_df.groupby(['Soil_Type'])['Cover_Type'].agg({'Soil_Type_Mean':'mean', \n                                                                        'Soil_Type_Std':'std', \n                                                                        'Soil_Type_Size':'size', \n                                                                        'Soil_Type_Sum':'sum'}).reset_index()\n    train_df = train_df.merge(soil_mean_encoding, on='Soil_Type', how='left')\n    test_df = test_df.merge(soil_mean_encoding, on='Soil_Type', how='left')\n    \n    wildness_mean_encoding = train_df.groupby(['Wilderness_Area'])['Cover_Type'].agg({'Wilderness_Area_Mean':'mean', \n                                                                              'Wilderness_Area_Std':'std', \n                                                                              'Wilderness_Area_Size':'size', \n                                                                              'Wilderness_Area_Sum':'sum'}).reset_index()\n    train_df = train_df.merge(wildness_mean_encoding, on='Wilderness_Area', how='left')\n    test_df = test_df.merge(wildness_mean_encoding, on='Wilderness_Area', how='left')\n    \n    train_df.drop(columns=category_feature, axis=1, inplace=True)\n    test_df.drop(columns=category_feature, axis=1, inplace=True)\n    \n    scale_feature = list(set(train_df.columns)-one_hot_feature-set(['Cover_Type','ID']))\n    sc = StandardScaler()\n    train_df[scale_feature] = sc.fit_transform(train_df[scale_feature])\n    test_df[scale_feature] = sc.transform(test_df[scale_feature] )\n    \n    return train_df, test_df",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "8b458eb1f4614924af4d7d559283e20f758e2638"
+      },
+      "cell_type": "code",
+      "source": "train_df, test_df = tree_data_preprocessing(train, test)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "3cc1c94c6c39553c68b84391204235cca669b7cf"
+      },
+      "cell_type": "markdown",
+      "source": "# Mean Encoding\nCategory Column을 직접적으로 Target 값과 연관시킵니다. <br>\n많은 대회에서 사용하고 자주 사용되는 성능이 검증된 방법입니다.<br>\n다만 주의하실 점은, Target 값과 연관시키다보니 leak이 발생할수도 있습니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "9b9130320f9272e4108fdb94861011ac7c4ae0c1"
+      },
+      "cell_type": "code",
+      "source": "soil_mean_encoding = train_df.groupby(['Soil_Type'])['Cover_Type'].agg({'Soil_Type_Mean':'mean', \n                                                                        'Soil_Type_Std':'std', \n                                                                        'Soil_Type_Size':'size', \n                                                                        'Soil_Type_Sum':'sum'}).reset_index()",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "23e0e1d039c51be2b68b6dc16a2a9d18158929bb"
+      },
+      "cell_type": "code",
+      "source": "train_df = train_df.merge(soil_mean_encoding, on='Soil_Type', how='left')\ntest_df = test_df.merge(soil_mean_encoding, on='Soil_Type', how='left')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "4704ef531af7c17f2515eafbb7d2009f9d4fa37b"
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_cv(train_df)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "7d8da190d1cd5722dc696c15f7366c66bbd68da6"
+      },
+      "cell_type": "code",
+      "source": "wildness_mean_encoding = train_df.groupby(['Wilderness_Area'])['Cover_Type'].agg({'Wilderness_Area_Mean':'mean', \n                                                                              'Wilderness_Area_Std':'std', \n                                                                              'Wilderness_Area_Size':'size', \n                                                                              'Wilderness_Area_Sum':'sum'}).reset_index()\nwildness_mean_encoding",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "9b890dd5c335b1e7de7be3363a82d640ca6054d1"
+      },
+      "cell_type": "code",
+      "source": "train_df = train_df.merge(wildness_mean_encoding, on='Wilderness_Area', how='left')\ntest_df = test_df.merge(wildness_mean_encoding, on='Wilderness_Area', how='left')",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "scrolled": true,
+        "_uuid": "3fe72a3911fabb0806212852ef9a45652a69f6c9"
+      },
+      "cell_type": "code",
+      "source": "baseline_tree_cv(train_df)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "_uuid": "43adf7ec3d8d5113960702ca5eda0f72ca1d25ed"
+      },
+      "cell_type": "markdown",
+      "source": "## Neural Network도 성능비교를 해보겠습니다."
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "6fab795686f4d99a21bb748428a40e7fffad1799"
+      },
+      "cell_type": "code",
+      "source": "nn_train_df, nn_test_df = nn_data_preprocessing(train, test)",
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "metadata": {
+        "trusted": true,
+        "_uuid": "05b9920d205d472d1a4ada9c7a16c2e874f5a844"
+      },
+      "cell_type": "code",
+      "source": "baseline_keras_cv(nn_train_df)",
+      "execution_count": null,
+      "outputs": []
+    }
+  ],
+  "metadata": {
+    "kernelspec": {
+      "display_name": "Python 3",
+      "language": "python",
+      "name": "python3"
+    },
+    "language_info": {
+      "name": "python",
+      "version": "3.6.6",
+      "mimetype": "text/x-python",
+      "codemirror_mode": {
+        "name": "ipython",
+        "version": 3
+      },
+      "pygments_lexer": "ipython3",
+      "nbconvert_exporter": "python",
+      "file_extension": ".py"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 1
+}
