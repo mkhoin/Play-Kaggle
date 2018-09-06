@@ -8,4 +8,5 @@
 
 
 ## Code Memo
-- df.describe()시 e+6 이런 식으로 숫자가 나올 경우 : ```pd.set_option('float_format', '{:.3f}'.format)```로 해결
+- ```df.describe()```시 e+6 이런 식으로 숫자가 나올 경우 : ```pd.set_option('float_format', '{:.3f}'.format)```로 해결
+- ```np.logical_and(조건A, B)``` : logical 연산 
