@@ -6,10 +6,10 @@
 
 |                  Competition                 | Main Algorithms |       Period      |    Rank   |  Prize |
 |:--------------------------------------------:|:---------------:|:-----------------:|:---------:|:------:|
-|       Santander Product Recommendation       |  Random Forest  |      2016.12      |  600/1784 |        |
-|         Expedia Hotel Recommendations        |  Random Forest  |      2017.02      | 1260/1974 |        |
+|       [Santander Product Recommendation](https://github.com/zzsza/Kaggle_Santander-Product-Recommendation/tree/5480e0adc160e9dfdea522ea1557b2e184b7e686)       |  Random Forest  |      2016.12      |  600/1784 |        |
+|         [Expedia Hotel Recommendations](https://github.com/zzsza/Kaggle_Expedia-hotel-recommendations/tree/bb45080c7362ad8d3ba4b21d689b4f638e236aa0)        |  Random Forest  |      2017.02      | 1260/1974 |        |
 |        Zillow's Home Value Prediction        |  FE + StackNet  | 2017.09 ~ 2017.11 |  81/3799  | Silver |
-| Google Analytics Customer Revenue Prediction |                 |      current      |           |        |
+| [Google Analytics Customer Revenue Prediction](https://github.com/zzsza/Play-Kaggle/tree/master/Google-Analytics-Customer-Revenue-Prediction) |                 |      current      |           |        |
 
 
 ## Code Memo
