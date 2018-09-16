@@ -13,4 +13,4 @@
 - ```%config InlineBackend.figure_format = 'retina'``` : 맥에서 retina 설정. 매번 까먹음
 - string formatting에서 속도가 가장 빠른 것은 f'{string}'!
 	- 파이콘2018 안주은님 발표 [Pythonic한 코드가 효율적일까?](https://www.slideshare.net/ssuserd5b689/pythonic-110444563#20) 참고
-- ```cols_to_drop = [col for col in train.columns if train[col].nunique() == 1]``` : value가 1가지로 구성된 column 찾기
+- ```cols_to_drop = [col for col in train.columns if train[col].nunique() == 1]``` : value가 1개인 column
