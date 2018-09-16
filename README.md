@@ -1,10 +1,15 @@
 # Play-Kaggle
 - [Kaggle](https://www.kaggle.com/)에 참여한 기록을 남기는 Repo입니다
-
+- Kaggle 관련 자료가 필요하신 분은 [Kaggle-knowhow](https://github.com/zzsza/Kaggle-knowhow) Repo를 참고하면 좋을 것 같습니다
 
 ## 참여 대회 정보
-- Format 설정한 후, 추가 예정
 
+|                  Competition                 | Main Algorithms |       Period      |    Rank   |  Prize |
+|:--------------------------------------------:|:---------------:|:-----------------:|:---------:|:------:|
+|       Santander Product Recommendation       |  Random Forest  |      2016.12      |  600/1784 |        |
+|         Expedia Hotel Recommendations        |  Random Forest  |      2017.02      | 1260/1974 |        |
+|        Zillow's Home Value Prediction        |  FE + StackNet  | 2017.09 ~ 2017.11 |  81/3799  | Silver |
+| Google Analytics Customer Revenue Prediction |                 |      current      |           |        |
 
 
 ## Code Memo
