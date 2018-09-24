@@ -10,7 +10,7 @@
 
 ### Evaluation
 - RMSE
-- $$\hat{y}$$ : 고객에 대한 예상 수익, $$y$$ : 실제 수익
+- y(hat) : 고객에 대한 예상 수익, y : 실제 수익
 - [자연 로그](https://ko.wikipedia.org/wiki/%EC%9E%90%EC%97%B0%EB%A1%9C%EA%B7%B8) 형태로 예측
 
 ### 일정
@@ -38,7 +38,7 @@
 	- socialEngagementType : 참여도 유형, "소셜 참여" 또는 "소셜 참여 없음"
 	- totals : 세션 전체의 집계 값
 	- trafficSource : 세션이 시작된 트래픽 소스
-	- visitId : 세션의 식별자. 사용자에게만 고유. 완전 고유는 fullVisitorId와 VisidId의 조합
+	- visitId : 세션의 식별자. 사용자에게만 고유. 완전 고유는 fullVisitorId와 VisitId의 조합
 	- visitnumber : 사용자 세션 번호. 첫 세션이면 1
 	- visitStartTime : 타임 스탬프
 - 제거된 필드
@@ -51,4 +51,10 @@
 ```
 - 대회 참여 시작
 - 대회 Overview 확인 및 데이터셋 확인
+```
+
+### 2018.09.24
+```
+- EDA
+- Plot.ly 시각화 문법 탐색
 ```

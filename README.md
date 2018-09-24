@@ -19,3 +19,5 @@
 - string formatting에서 속도가 가장 빠른 것은 f'{string}'!
 	- 파이콘2018 안주은님 발표 [Pythonic한 코드가 효율적일까?](https://www.slideshare.net/ssuserd5b689/pythonic-110444563#20) 참고
 - ```cols_to_drop = [col for col in train.columns if train[col].nunique() == 1]``` : value가 1개인 column
+- ```pd.Series.nunique()``` : Series의 unique의 개수(n) return(Default : NA 제외)
+- ```A.intersection(*other_sets)``` : A(set)와 other sets의 교집합
