@@ -20,3 +20,6 @@
 - ```cols_to_drop = [col for col in train.columns if train[col].nunique() == 1]``` : value가 1개인 column
 - ```pd.Series.nunique()``` : Series의 unique의 개수(n) return(Default : NA 제외)
 - ```A.intersection(*other_sets)``` : A(set)와 other sets의 교집합
+- ```pd.options.display.max_columns = 999``` : max_columns 조절
+- ```pd.cut(카테고리화할 숫자 데이터, bins)``` : 데이터를 여러 구간으로 구분할 경우 사용, return 카테고리
+- ```plt.scatter```, ```sns.distplot```, ```sns.violinplot```
