@@ -23,3 +23,18 @@
 - ```pd.options.display.max_columns = 999``` : max_columns 조절
 - ```pd.cut(카테고리화할 숫자 데이터, bins)``` : 데이터를 여러 구간으로 구분할 경우 사용, return 카테고리
 - ```plt.scatter```, ```sns.distplot```, ```sns.violinplot```
+- lightgbm dataset : ```lgb.Dataset(train_feature, label=label, categorical_feature=categorical_feature)```
+- pandas도 chain 방식을 지원함. pandas 1.0 이후부턴 이렇게 사용하는게 늘어날 듯
+
+    ```
+    (pandas.read_csv('data/titanic.csv.gz')
+       .query('Age < Age.quantile(.99)')
+       .assign(Sex=lambda df: df['Sex'].replace({'female': 1, 'male': 0}),
+               Age=lambda df: pandas.cut(df['Age'].fillna(df.Age.median()),
+                                         bins=[df.Age.min(), 18, 40, df.Age.max()],
+                                         labels=['Underage', 'Young', 'Experienced']))
+       .pivot_table(values='Sex', columns='Pclass', index='Age', aggfunc='mean')
+       .rename_axis('', axis='columns')
+       .rename('Class {}'.format, axis='columns')
+       .style.format('{:.2%}'))
+    ```
