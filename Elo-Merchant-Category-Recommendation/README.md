@@ -44,3 +44,23 @@
 - lightgbm을 사용해 기본 모델링
 - score : 3.879
 ```
+
+### 2019-01-06
+```
+- 03.Feature-Engineering
+- lightgbm을 사용
+- Feature 추가
+- Sharing of my experinece 읽음 : https://www.kaggle.com/c/elo-merchant-category-recommendation/discussion/75935 
+- Score : 3.706
+```
+
+### 2019-01-07
+```
+- 04.Feature-Engineering-2nd
+- Feature 추가
+- Less is More 커널 읽음 : https://www.kaggle.com/c/elo-merchant-category-recommendation/discussion/73937
+- Score : 3.699
+```
+
+
+- MultiModel + RIDGE + STACKING : https://www.kaggle.com/ashishpatel26/rmse-3-66-multimodel-ridge-stacking
