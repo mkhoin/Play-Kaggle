@@ -62,5 +62,9 @@
 - Score : 3.699
 ```
 
-
-- MultiModel + RIDGE + STACKING : https://www.kaggle.com/ashishpatel26/rmse-3-66-multimodel-ridge-stacking
+### 2019-01-13
+```
+- Stacking 커널 읽음 : MultiModel + RIDGE + STACKING : https://www.kaggle.com/ashishpatel26/rmse-3-66-multimodel-ridge-stacking
+- Outlier 제외한 데이터 학습 + Outlier만 따로 학습해서 Concat
+- Score : 3.692
+```
