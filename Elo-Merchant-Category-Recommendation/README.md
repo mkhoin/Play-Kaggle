@@ -68,3 +68,11 @@
 - Outlier 제외한 데이터 학습 + Outlier만 따로 학습해서 Concat
 - Score : 3.692
 ```
+
+### 2019-01-14
+```
+- Outlier 더 잘 학습하기 위한 방법 고민 중
+- submission 제일 잘 된 것 2개를 mix해서 제출 (0.6 * submission1 + 0.4 * submission)
+- Score : 3.691
+- ToDo : StackNet 구현할까.. 조금만 수정해서? => 지금 상황에선 굳이..란 생각도 들긴 함
+```
