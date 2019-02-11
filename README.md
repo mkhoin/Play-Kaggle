@@ -38,3 +38,4 @@
        .rename('Class {}'.format, axis='columns')
        .style.format('{:.2%}'))
     ```
+- `df.loc[(조건), 'Target')] = 5` 특정 조건을 만족하는 경우에 값 할당하고 싶을 경우
