@@ -51,7 +51,7 @@
 	train = pd.read_csv('train.csv', nrows=NROWS)
 	```
 
-- 데이터가 800만개라면(=데이터가 너무 많다면) 우선 파일을 다 일은 후, `train = train.sample(frac=0.2)` 이렇게 샘플링해서 사용
+- 데이터가 800만개라면(=데이터가 너무 많다면) 우선 파일을 다 읽은 후, `train = train.sample(frac=0.2)` 이렇게 샘플링해서 사용
 	- 랜덤으로 하니 균등할 것이라 생각
 	- 만약 Inbalanced 할 것 같다면 아래와 같이
 
