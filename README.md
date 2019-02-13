@@ -39,3 +39,83 @@
        .style.format('{:.2%}'))
     ```
 - `df.loc[(조건), 'Target')] = 5` 특정 조건을 만족하는 경우에 값 할당하고 싶을 경우
+- xgboost : leaf-wise, lgbm : 가지치기
+- DEBUG 위해 이런 코드 사용
+	
+	```
+	DEBUG = True
+	if DEBUG:
+		NROWS = 10000
+	else:
+		NROWS = None
+	train = pd.read_csv('train.csv', nrows=NROWS)
+	```
+
+- 데이터가 800만개라면(=데이터가 너무 많다면) 우선 파일을 다 일은 후, `train = train.sample(frac=0.2)` 이렇게 샘플링해서 사용
+	- 랜덤으로 하니 균등할 것이라 생각
+	- 만약 Inbalanced 할 것 같다면 아래와 같이
+
+	```
+	from sklearn.model_selection import StratifiedKFold
+	
+	fold = StratifiedKFold(n_split=10, random_state=777)
+	
+	for trn_idx, val_idx in fold.split(train, train['target']):
+		break
+	train = train.iloc[trn_idx]
+	```	
+
+- High cardinality : 범주의 개수가 많은 변수
+	- LightGBM 써도 괜찮고, 2개의 subset으로 잘 나눠도 좋음(성능도 좋고 속도도 빠름)
+	- 원핫인코딩을 그대로 넣으면 트리가 언밸런스해지고 트리가 더 깊어짐 => 시간은 더 소요되고 오버피팅 가능성 존재
+	- 쉽게 찾는 코드
+
+	```
+	for col in columns:
+		print(col, train[col].nuique())
+	```
+- 메타 데이터 정리
+	- 각 컬럼들이 어떤 상태인지 정리
+
+	```
+	data = []
+	for f in train.columns:
+	    # Defining the role
+	    if f == 'target':
+	        role = 'target'
+	    elif f == 'id':
+	        role = 'id'
+	    else:
+	        role = 'input'
+         
+    # Defining the level
+    if 'bin' in f or f == 'target':
+        level = 'binary'
+    elif 'cat' in f or f == 'id':
+        level = 'nominal'
+    elif train[f].dtype == float:
+        level = 'interval'
+    elif train[f].dtype == int:
+        level = 'ordinal'
+        
+    # Initialize keep to True for all variables except for id
+    keep = True
+    if f == 'id':
+        keep = False
+    
+    # Defining the data type 
+    dtype = train[f].dtype
+    
+    # Creating a Dict that contains all the metadata for the variable
+    f_dict = {
+        'varname': f,
+        'role': role,
+        'level': level,
+        'keep': keep,
+        'dtype': dtype
+    }
+    data.append(f_dict)
+    
+	meta = pd.DataFrame(data, columns=['varname', 'role', 'level', 'keep', 'dtype'])
+	meta.set_index('varname', inplace=True)
+	``` 	
