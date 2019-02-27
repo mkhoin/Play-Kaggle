@@ -119,3 +119,8 @@
 	meta = pd.DataFrame(data, columns=['varname', 'role', 'level', 'keep', 'dtype'])
 	meta.set_index('varname', inplace=True)
 	``` 	
+- ELO 1등 트릭 : 아래 Feature로 0.015 상승
+	
+	```
+	train['final'] = train['binpredict'](-33.21928)+(1-train['binpredict'])train['no_outlier']
+	```	
