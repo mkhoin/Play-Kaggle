@@ -9,7 +9,7 @@
 |       [Santander Product Recommendation](https://github.com/zzsza/Kaggle_Santander-Product-Recommendation/tree/5480e0adc160e9dfdea522ea1557b2e184b7e686)       |  Random Forest  |      2016.12      |  600/1784 |        |
 |         [Expedia Hotel Recommendations](https://github.com/zzsza/Kaggle_Expedia-hotel-recommendations/tree/bb45080c7362ad8d3ba4b21d689b4f638e236aa0)        |  Random Forest  |      2017.02      | 1260/1974 |        |
 |        Zillow's Home Value Prediction        |  FE + StackNet  | 2017.09 ~ 2017.11 |  81/3799  | Silver |
-| [Elo Merchant Category Recommendation](https://github.com/zzsza/Play-Kaggle/tree/master/Elo-Merchant-Category-Recommendation) | lgbm + post process |  2018.12 ~ 2019.02  |  (Public:48/4129)\n Private:2613/4129      |        |
+| [Elo Merchant Category Recommendation](https://github.com/zzsza/Play-Kaggle/tree/master/Elo-Merchant-Category-Recommendation) | lgbm + post process |  2018.12 ~ 2019.02  |  (Public:48/4129)<br> Private:2613/4129      |        |
 
 ## Code Memo
 - ```df.describe()```시 e+6 이런 식으로 숫자가 나올 경우 : ```pd.set_option('float_format', '{:.3f}'.format)```로 해결
