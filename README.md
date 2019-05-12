@@ -124,3 +124,9 @@
 	```
 	train['final'] = train['binpredict'](-33.21928)+(1-train['binpredict'])train['no_outlier']
 	```	
+
+- df['column'].value_counts()>=2로 조건을 걸고 데이터프레임을 새로 만들고 싶은 경우
+
+	```
+	df[df.groupby('column')['column'].transform('size') >= 2]
+	```
